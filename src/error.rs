@@ -76,6 +76,14 @@ pub enum ParseLayer {
     ParseObject(ParseObject),
     #[error("failed to parse layer: `{0}`")]
     MissingLayerName(MissingLayerName),
+    #[error("failed to parse layer: `{0}`")]
+    MissingLayerId(MissingLayerId),
+}
+
+#[derive(thiserror::Error, Debug, Constructor)]
+#[error("missing `id` attribute for <g> attribute of layer, maybe it was not UTF8? `{element:?}`")]
+pub struct MissingLayerId{
+    element: BytesStart<'static>
 }
 
 #[derive(thiserror::Error, Debug, Constructor)]

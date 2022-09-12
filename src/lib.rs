@@ -21,12 +21,22 @@ pub struct Inkscape {
 
 #[derive(Debug)]
 pub struct Layer {
+    id: String,
+    name: String,
     header: Event<'static>,
     content: Vec<object::Object>,
     footer: Event<'static>,
 }
 
 impl Layer {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     /// make a layer visible
     pub fn set_visible(&mut self) {
         let elem = if let Event::Start(elem) = &mut self.header {
@@ -47,9 +57,11 @@ impl Layer {
 
             let atts = elem.attributes()
                 .filter_map(Result::ok)
-                .filter(|att| att.value != b"style".as_slice());
+                .filter(|att| att.key != QName(b"style"));
 
             new_elem.extend_attributes(atts);
+            self.header = Event::Start(new_elem);
+
         }
     }
 
@@ -70,11 +82,14 @@ impl Layer {
             .chain(std::iter::once(quick_xml::events::attributes::Attribute { key: QName(b"style"), value: b"display:none".as_slice().into() }));
 
         new_elem.extend_attributes(atts);
+        self.header = Event::Start(new_elem);
     }
 
     #[cfg(test)]
     fn eof_group_test(content: Vec<object::Object>) -> Self {
         Self {
+            id: "adf".into(),
+            name: "adf".into(),
             header: Event::Eof,
             content,
             footer: Event::Eof,
@@ -292,4 +307,39 @@ fn id_iterator() {
     let iter = IdIterator::new(&groups);
     let ids = iter.collect::<Vec<_>>();
     assert_eq!(&["1", "2", "3", "4", "5"], ids.as_slice());
+}
+
+#[test]
+fn make_layer_hidden() {
+    use std::path::PathBuf;
+
+    let path = PathBuf::from("./static/three_layer_hidding.svg");
+    let output = PathBuf::from("./static/three_layer_hidding_output.svg");
+
+    let file = std::fs::File::open(&path).unwrap();
+    let writer = std::fs::File::create(&output).unwrap();
+
+    let reader = std::io::BufReader::new(file);
+
+    let mut buffer = Vec::new();
+
+    let mut inkscape = Inkscape::parse_svg(reader, &mut buffer).unwrap();
+
+    //dbg!(&inkscape);
+
+    for layer in inkscape.get_layers_mut().iter_mut() {
+        dbg!(layer.id(), layer.name());
+        if layer.name() == "Layer 2" {
+            println!("setting layer 2 hidden");
+            layer.set_hidden();
+        }
+
+        if layer.name() == "Layer 3" {
+            println!("setting layer 3 visible");
+            layer.set_visible();
+        }
+    }
+
+    inkscape.write_svg(writer).unwrap();
+    panic!()
 }

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="222mm"
+   viewBox="0 0 210 222"
+   version="1.1"
+   id="svg1031"
+   inkscape:version="1.1.1 (3bf5ae0d25, 2021-09-20)"
+   sodipodi:docname="three_layer_hidding.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1033"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="0.54866744"
+     inkscape:cx="378.18901"
+     inkscape:cy="649.75607"
+     inkscape:window-width="1904"
+     inkscape:window-height="954"
+     inkscape:window-x="8"
+     inkscape:window-y="118"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer4" />
+  <defs
+     id="defs1028" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     style="display:inline">
+    <rect
+       style="fill:#34ff14;fill-opacity:1;stroke-width:0.449059"
+       id="rect1116"
+       width="197.60896"
+       height="70.326851"
+       x="6.473557"
+       y="9.5036697" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer3"
+     inkscape:label="Layer 2">
+    <rect
+       style="display:inline;fill:#34215b;fill-opacity:1;stroke-width:0.264999"
+       id="rect1484"
+       width="197.86183"
+       height="67.089165"
+       x="6.5062866"
+       y="91.443253" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer4"
+     inkscape:label="Layer 3"
+     style="display:none">
+    <rect
+       style="display:inline;fill:#ec215b;fill-opacity:1;stroke-width:0.264999"
+       id="rect2124"
+       width="199.30579"
+       height="44.760185"
+       x="6.0134025"
+       y="169.94278" />
+  </g>
+</svg>

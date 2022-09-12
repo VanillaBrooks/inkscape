@@ -71,19 +71,22 @@ pub(crate) fn layers<R: BufRead>(
         let event = event.into_owned();
 
         if let Event::Start(element) = event {
+            // if we are starting a new layer, then parse it
             if element.name() == QName(b"g") {
-                // TODO: why are these things below commented, and why does
-                // this work?
-
-                // we are at the first layer event, leave this function
-                //return Ok((out, Some(event)))
-
                 let grp = group(element, reader, buffer)?;
                 out.push(grp);
-
             }
-        } else {
-            return Ok((out, event));
+            // otherwise, we have exhaused looking at all the layers
+            else {
+                return Ok((out, Event::Start(element)));
+            }
+        } 
+        // if we have hit an end tag then we have reached the end of 
+        // the layer list in another way, we also need to return
+        //
+        // this is probably a </svg> tag
+        else if matches!(event, Event::End(_)) {
+            return Ok((out, event))
         }
     }
 
@@ -98,6 +101,15 @@ pub(crate) fn group<R: BufRead>(
     reader: &mut quick_xml::Reader<R>,
     buffer: &mut Vec<u8>,
 ) -> Result<Layer, ParseLayer> {
+    let id_attribute = start_event.try_get_attribute(b"id")
+        .map_err(|_| MissingLayerId::new(start_event.clone()))?
+        .ok_or_else(||MissingLayerId::new(start_event.clone()))?;
+
+    let id = String::from_utf8(id_attribute.value.to_vec())
+        .map_err(|_| MissingLayerId::new(start_event.clone()))?;
+
+    let name = layer_name(&start_event)?;
+
     let mut content = Vec::new();
 
     let mut footer = None;
@@ -134,6 +146,8 @@ pub(crate) fn group<R: BufRead>(
     };
 
     let grp = Layer {
+        id,
+        name,
         header: Event::Start(start_event),
         content,
         footer,
@@ -170,7 +184,7 @@ fn layer_name(layer_start_event: &BytesStart<'static>) -> Result<String, Missing
         .into_iter()
         .filter_map(|x| x.ok())
         .map(|att| (att.key, att.value))
-        .find(|(key, _)| key ==  &QName(b"id"))
+        .find(|(key, _)| key ==  &QName(b"inkscape:label"))
         .ok_or_else(|| MissingLayerName::new(layer_start_event.clone()))?;
 
     let out = String::from_utf8(name_id.to_vec())
