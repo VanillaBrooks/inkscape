@@ -1,5 +1,6 @@
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
+use quick_xml::name::QName;
 use std::io::Read;
 
 use super::error::*;
@@ -34,11 +35,13 @@ pub(crate) struct Rectangle {
 }
 
 impl Rectangle {
-    pub(crate) fn set_image(&mut self, base64_encoded: EncodedImage) {
-        let new_element = quick_xml::events::BytesStart::owned_name(b"image".to_vec());
+    pub(crate) fn set_image(&mut self, base64_encoded: EncodedImage) -> Image {
+        let mut new_element =self.element.to_owned();
+        new_element.set_name(b"image")
+            .clear_attributes();
 
         let img_data = quick_xml::events::attributes::Attribute {
-            key: b"xlink:href",
+            key: QName(b"xlink:href"),
             value: base64_encoded.as_slice().into(),
         };
 
@@ -47,7 +50,7 @@ impl Rectangle {
             .attributes()
             .filter_map(Result::ok)
             // remove attributes from the iterator that are used for rectangular elements
-            .filter(|rect_attribute| rect_attribute.key != b"style")
+            .filter(|rect_attribute| rect_attribute.key != QName(b"style"))
             // add on the image data
             .chain(std::iter::once(img_data));
 
@@ -55,14 +58,18 @@ impl Rectangle {
         // TODO: this updates the underlying element away from `Rectangle`, which may be confusing
         // in the future
         let new_element = new_element.with_attributes(new_atts);
-        self.element = new_element;
+
+        Image {
+            ident: self.ident.clone(),
+            element: new_element
+        }
     }
 
     #[cfg(test)]
     pub(crate) fn from_ident(ident: Identifiers) -> Self {
         Self {
             ident,
-            element: BytesStart::owned_name(b"rect".to_vec()),
+            element: BytesStart::new("rect"),
         }
     }
 }
@@ -79,10 +86,13 @@ pub(crate) struct Image {
 
 impl Image {
     pub(crate) fn update_image(&mut self, base64_encoded: EncodedImage) {
-        let new_element = quick_xml::events::BytesStart::owned_name(b"image".to_vec());
+        //let new_element = quick_xml::events::BytesStart::owned_name(b"image".to_vec());
+        let mut new_element = self.element.to_owned();
+        new_element.clear_attributes();
+
 
         let img_data = quick_xml::events::attributes::Attribute {
-            key: b"xlink:href",
+            key: QName(b"xlink:href"),
             value: base64_encoded.as_slice().into(),
         };
 
@@ -91,7 +101,7 @@ impl Image {
             .attributes()
             .filter_map(Result::ok)
             // remove attributes from the iterator that are used for image elements
-            .filter(|rect_attribute| rect_attribute.key != b"xlink:href")
+            .filter(|rect_attribute| rect_attribute.key != QName(b"xlink:href"))
             // add on the image data
             .chain(std::iter::once(img_data));
 
@@ -106,12 +116,12 @@ impl Image {
     pub(crate) fn from_ident(ident: Identifiers) -> Self {
         Self {
             ident,
-            element: BytesStart::owned_name(b"image".to_vec()),
+            element: BytesStart::new("image"),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Identifiers {
     pub(crate) id: String,
     pub(crate) width: f64,
@@ -129,28 +139,32 @@ impl Identifiers {
     }
 
     pub(crate) fn from_elem(elem: &BytesStart<'static>) -> Result<Self, IdentifierError> {
+        const WIDTH : QName = QName(b"width");
+        const HEIGHT : QName = QName(b"height");
+        const ID : QName = QName(b"id");
+
         let atts = elem
             .attributes()
             .filter_map(Result::ok)
-            .filter(|att| att.key == b"width" || att.key == b"height" || att.key == b"id");
+            .filter(|att| att.key == WIDTH || att.key == HEIGHT || att.key == ID);
 
         let mut width = None;
         let mut height = None;
         let mut id = None;
 
         for att in atts {
-            if att.key == b"width" {
+            if att.key == WIDTH {
                 let number = String::from_utf8(att.value.to_vec())
                     .map_err(|err| DimensionUtf8::new(err, DimensionOrId::Width))?;
 
                 width = Some(number.parse().map_err(|err| DimensionParse::new(err, DimensionOrId::Width))?);
 
-            } else if att.key == b"height" {
+            } else if att.key == HEIGHT {
                 let number = String::from_utf8(att.value.to_vec())
                     .map_err(|err| DimensionUtf8::new(err, DimensionOrId::Height))?;
 
                 height = Some(number.parse().map_err(|err| DimensionParse::new(err, DimensionOrId::Width))?);
-            } else if att.key == b"id" {
+            } else if att.key == ID {
                 let id_utf8 = String::from_utf8(att.value.to_vec())
                     .map_err(|err| DimensionUtf8::new(err, DimensionOrId::Id))?;
                 id = Some(id_utf8)
@@ -231,7 +245,9 @@ FUlEQVQY02MMaBRnwA2YGPCCkSoNACS6APwkkpJNAAAAAElFTkSuQmCC
        y="76.012566" />
 "##;
 
-    let img_path = "./static/10x10_green.png";
+    dbg!(element);
+
+    let img_path = "./static/10x10_red.png";
     let encoded_bytes = EncodedImage::from_path(img_path).unwrap();
 
     let bytes = element.as_bytes();
@@ -239,10 +255,8 @@ FUlEQVQY02MMaBRnwA2YGPCCkSoNACS6APwkkpJNAAAAAElFTkSuQmCC
     let mut reader = quick_xml::Reader::from_reader(reader);
     let mut buffer = Vec::new();
 
-    // for some reason the first item out is always useless
-    let _first_event = reader.read_event(&mut buffer).unwrap();
     // the second element contains out BytesStart<_>
-    let event = reader.read_event(&mut buffer).unwrap();
+    let event = reader.read_event_into(&mut buffer).unwrap();
 
     let object = if let Event::Empty(event) = event {
         super::parse::object(event.into_owned()).unwrap()
@@ -258,9 +272,72 @@ FUlEQVQY02MMaBRnwA2YGPCCkSoNACS6APwkkpJNAAAAAElFTkSuQmCC
 
     image.update_image(encoded_bytes);
 
-    dbg!(&image);
+    // pull out the element from the structure to ensure that we have changed it how we expected to
+    let output_image = image.element.attributes()
+        .filter_map(|x| x.ok())
+        .find(|att| att.key == QName(b"xlink:href"))
+        .unwrap();
 
-    //panic!();
+    // convert to a string for ease of comparison
+    let output_value = String::from_utf8(output_image.value.to_owned().to_vec()).unwrap();
+
+    // ensure that the image has actually changed
+    // here QmCC is a string from the end of the above element -
+    // if the element was updated correctly then the string should 
+    // not be present in the new image data
+    assert_eq!(false, output_value.contains("QmCC"));
+}
+
+#[test]
+fn update_rectangle() {
+    let element = r##"<rect
+       style="fill:#ff0000;stroke-width:0.665001"
+       id="rect286"
+       width="85.292282"
+       height="48.174355"
+       x="38.076923"
+       y="16.923077" />
+"##;
+
+    let img_path = "./static/10x10_red.png";
+    let encoded_bytes = EncodedImage::from_path(img_path).unwrap();
+
+    let bytes = element.as_bytes();
+    let reader = std::io::BufReader::new(bytes);
+    let mut reader = quick_xml::Reader::from_reader(reader);
+    let mut buffer = Vec::new();
+
+    // the second element contains out BytesStart<_>
+    let event = reader.read_event_into(&mut buffer).unwrap();
+
+    let object = if let Event::Empty(event) = event {
+        super::parse::object(event.into_owned()).unwrap()
+    } else {
+        panic!("event was {event:?} was /not/ what we expected it to be");
+    };
+
+    let mut rect = if let Object::Rectangle(rect) = object {
+        rect
+    } else {
+        panic!("did not parse element as image, this should not happen");
+    };
+
+    let image = rect.set_image(encoded_bytes);
+
+    // pull out the element from the structure to ensure that we have changed it how we expected to
+    let output_image = image.element.attributes()
+        .filter_map(|x| x.ok())
+        .find(|att| att.key == QName(b"xlink:href"))
+        .unwrap();
+
+    // convert to a string for ease of comparison
+    let output_value = String::from_utf8(output_image.value.to_owned().to_vec()).unwrap();
+
+    dbg!(&output_value);
+
+    // ensure that there is an image data section on the new element
+    assert_eq!(true, output_value.contains("data:image/png;"));
+    assert_eq!(QName(b"image"), image.element.name());
 }
 
 #[test]

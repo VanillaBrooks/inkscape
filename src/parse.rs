@@ -5,6 +5,7 @@ use super::error::*;
 
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
+use quick_xml::name::QName;
 
 use std::io::BufRead;
 
@@ -14,14 +15,14 @@ pub(crate) fn leading_events<R: BufRead>(
 ) -> (Vec<Event<'static>>, Option<BytesStart<'static>>) {
     let mut out = Vec::new();
 
-    while let Ok(event) = reader.read_event(buffer) {
+    while let Ok(event) = reader.read_event_into(buffer) {
         let event = event.into_owned();
 
         if let Event::Start(element) = event {
             // if the name is starts a <g> tag then we
             // know that we are out of the leading events and are now in
             // the layer parsing, we need to return
-            if element.name() == b"g" {
+            if element.name() == QName(b"g") {
                 return (out, Some(element))
             } else {
                 // we had a Event::Start(_) but it was not a starting
@@ -45,7 +46,7 @@ pub(crate) fn trailing_events<R: BufRead>(
     let mut out = Vec::new();
 
     out.push(first_trailing_event);
-    while let Ok(event) = reader.read_event(buffer) {
+    while let Ok(event) = reader.read_event_into(buffer) {
         if let Event::Eof = event {
             break;
         } else {
@@ -66,11 +67,11 @@ pub(crate) fn layers<R: BufRead>(
     let first_group = group(first_layer_start, reader, buffer)?;
     out.push(first_group);
 
-    while let Ok(event) = reader.read_event(buffer) {
+    while let Ok(event) = reader.read_event_into(buffer) {
         let event = event.into_owned();
 
         if let Event::Start(element) = event {
-            if element.name() == b"g" {
+            if element.name() == QName(b"g") {
                 // TODO: why are these things below commented, and why does
                 // this work?
 
@@ -101,7 +102,7 @@ pub(crate) fn group<R: BufRead>(
 
     let mut footer = None;
 
-    while let Ok(event) = reader.read_event(buffer) {
+    while let Ok(event) = reader.read_event_into(buffer) {
         let event = event.into_owned();
 
         match event {
@@ -145,13 +146,13 @@ pub(crate) fn group<R: BufRead>(
 /// by the user
 pub(crate) fn object(element: BytesStart<'static>) -> Result<object::Object, IdentifierError> {
     let obj = match element.name() {
-        b"image" => {
+        QName(b"image") => {
             // parse as an image
             let ident = object::Identifiers::from_elem(&element)?;
 
             object::Object::Image(object::Image { ident, element })
         }
-        b"rect" => {
+        QName(b"rect") => {
             // parse as a rectangle
             let ident = object::Identifiers::from_elem(&element)?;
 
@@ -169,7 +170,7 @@ fn layer_name(layer_start_event: &BytesStart<'static>) -> Result<String, Missing
         .into_iter()
         .filter_map(|x| x.ok())
         .map(|att| (att.key, att.value))
-        .find(|(key, _)| key == &b"id".as_slice())
+        .find(|(key, _)| key ==  &QName(b"id"))
         .ok_or_else(|| MissingLayerName::new(layer_start_event.clone()))?;
 
     let out = String::from_utf8(name_id.to_vec())

@@ -7,6 +7,8 @@ use error::*;
 pub use object::EncodedImage;
 
 use quick_xml::events::Event;
+use quick_xml::name::QName;
+
 use std::io::BufRead;
 use std::io::Write;
 
@@ -25,6 +27,51 @@ pub struct Layer {
 }
 
 impl Layer {
+    /// make a layer visible
+    pub fn set_visible(&mut self) {
+        let elem = if let Event::Start(elem) = &mut self.header {
+            elem
+        } else {
+            panic!("miss parsed a layer, the header should be Event::Start");
+        };
+
+        let curr_style = elem.attributes()
+            .filter_map(Result::ok)
+            .find(|att| att.key == QName(b"style"));
+
+        // if there is a style set, just filter it out
+        // `style` attribute is how elements are shown and hidden
+        if curr_style.is_some() {
+            let mut new_elem = elem.to_owned();
+            new_elem.clear_attributes();
+
+            let atts = elem.attributes()
+                .filter_map(Result::ok)
+                .filter(|att| att.value != b"style".as_slice());
+
+            new_elem.extend_attributes(atts);
+        }
+    }
+
+    /// make a layer hidden
+    pub fn set_hidden(&mut self) {
+        let elem = if let Event::Start(elem) = &mut self.header {
+            elem
+        } else {
+            panic!("miss parsed a layer, the header should be Event::Start");
+        };
+
+        let mut new_elem = elem.to_owned();
+        new_elem.clear_attributes();
+
+        let atts = elem.attributes()
+            .filter_map(Result::ok)
+            .filter(|att| att.value != b"style".as_slice())
+            .chain(std::iter::once(quick_xml::events::attributes::Attribute { key: QName(b"style"), value: b"display:none".as_slice().into() }));
+
+        new_elem.extend_attributes(atts);
+    }
+
     #[cfg(test)]
     fn eof_group_test(content: Vec<object::Object>) -> Self {
         Self {
@@ -106,7 +153,8 @@ impl Inkscape {
                 match object {
                     object::Object::Rectangle(rect) => {
                         if rect.ident.id == id {
-                            rect.set_image(image);
+                            let image = rect.set_image(image);
+                            *object = object::Object::Image(image);
 
                             return Ok(());
                         }
@@ -230,11 +278,11 @@ fn id_iterator() {
         Layer::eof_group_test(vec![]),
         Layer::eof_group_test(vec![
             Object::Rectangle(Rectangle::from_ident(Identifiers::zeros_with_id("4"))),
-            Object::Other(Event::Empty(BytesStart::owned_name(
-                b"doesnt_matter".to_vec(),
+            Object::Other(Event::Empty(BytesStart::new(
+                "doesnt_matter",
             ))),
-            Object::Other(Event::Empty(BytesStart::owned_name(
-                b"doesnt_matter2".to_vec(),
+            Object::Other(Event::Empty(BytesStart::new(
+                "doesnt_matter2",
             ))),
             Object::Rectangle(Rectangle::from_ident(Identifiers::zeros_with_id("5"))),
         ]),
