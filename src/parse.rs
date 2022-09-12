@@ -23,7 +23,7 @@ pub(crate) fn leading_events<R: BufRead>(
             // know that we are out of the leading events and are now in
             // the layer parsing, we need to return
             if element.name() == QName(b"g") {
-                return (out, Some(element))
+                return (out, Some(element));
             } else {
                 // we had a Event::Start(_) but it was not a starting
                 // event for <g>, so lets just put it back into Event::Start(_)
@@ -80,17 +80,23 @@ pub(crate) fn layers<R: BufRead>(
             else {
                 return Ok((out, Event::Start(element)));
             }
-        } 
-        // if we have hit an end tag then we have reached the end of 
+        }
+        // if we have hit an end tag then we have reached the end of
         // the layer list in another way, we also need to return
         //
         // this is probably a </svg> tag
-        else if matches!(event, Event::End(_)) {
-            return Ok((out, event))
+        else if let Event::End(end) = event {
+            if end.name() == QName(b"text") {
+                panic!("hit </text> ending element in svg parsing - this should not happen as it should be stored in objects for the layer");
+            } else {
+                return Ok((out, Event::End(end)));
+            }
+            //println!("early exit from layers parsing for tag: {event:?}");
+            //break
         }
     }
 
-    // only happens if our while let Ok(_) = loop ends with an error 
+    // only happens if our while let Ok(_) = loop ends with an error
     // which requires some malformed xml
     panic!("finished / errored on reading xml elements from inkscape document without returning correctly. Your inkscape document likely contains malformed xml");
 }
@@ -101,9 +107,10 @@ pub(crate) fn group<R: BufRead>(
     reader: &mut quick_xml::Reader<R>,
     buffer: &mut Vec<u8>,
 ) -> Result<Layer, ParseLayer> {
-    let id_attribute = start_event.try_get_attribute(b"id")
+    let id_attribute = start_event
+        .try_get_attribute(b"id")
         .map_err(|_| MissingLayerId::new(start_event.clone()))?
-        .ok_or_else(||MissingLayerId::new(start_event.clone()))?;
+        .ok_or_else(|| MissingLayerId::new(start_event.clone()))?;
 
     let id = String::from_utf8(id_attribute.value.to_vec())
         .map_err(|_| MissingLayerId::new(start_event.clone()))?;
@@ -120,15 +127,14 @@ pub(crate) fn group<R: BufRead>(
         match event {
             Event::Empty(xml_object) => {
                 // parse the object
-                let object = object(xml_object)
-                    .map_err(|err| {
-                        let layer_name = layer_name(&start_event).unwrap();
-                        ParseObject::new(err, layer_name)
-                    })?;
+                let object = object(xml_object).map_err(|err| {
+                    let layer_name = layer_name(&start_event).unwrap();
+                    ParseObject::new(err, layer_name)
+                })?;
 
                 content.push(object);
             }
-            Event::End(end) => {
+            Event::End(end) if end.name() == QName(b"g") => {
                 footer = Some(Event::End(end));
                 break;
             }
@@ -184,7 +190,7 @@ fn layer_name(layer_start_event: &BytesStart<'static>) -> Result<String, Missing
         .into_iter()
         .filter_map(|x| x.ok())
         .map(|att| (att.key, att.value))
-        .find(|(key, _)| key ==  &QName(b"inkscape:label"))
+        .find(|(key, _)| key == &QName(b"inkscape:label"))
         .ok_or_else(|| MissingLayerName::new(layer_start_event.clone()))?;
 
     let out = String::from_utf8(name_id.to_vec())

@@ -36,9 +36,8 @@ pub(crate) struct Rectangle {
 
 impl Rectangle {
     pub(crate) fn set_image(&mut self, base64_encoded: EncodedImage) -> Image {
-        let mut new_element =self.element.to_owned();
-        new_element.set_name(b"image")
-            .clear_attributes();
+        let mut new_element = self.element.to_owned();
+        new_element.set_name(b"image").clear_attributes();
 
         let img_data = quick_xml::events::attributes::Attribute {
             key: QName(b"xlink:href"),
@@ -61,7 +60,7 @@ impl Rectangle {
 
         Image {
             ident: self.ident.clone(),
-            element: new_element
+            element: new_element,
         }
     }
 
@@ -89,7 +88,6 @@ impl Image {
         //let new_element = quick_xml::events::BytesStart::owned_name(b"image".to_vec());
         let mut new_element = self.element.to_owned();
         new_element.clear_attributes();
-
 
         let img_data = quick_xml::events::attributes::Attribute {
             key: QName(b"xlink:href"),
@@ -139,9 +137,9 @@ impl Identifiers {
     }
 
     pub(crate) fn from_elem(elem: &BytesStart<'static>) -> Result<Self, IdentifierError> {
-        const WIDTH : QName = QName(b"width");
-        const HEIGHT : QName = QName(b"height");
-        const ID : QName = QName(b"id");
+        const WIDTH: QName = QName(b"width");
+        const HEIGHT: QName = QName(b"height");
+        const ID: QName = QName(b"id");
 
         let atts = elem
             .attributes()
@@ -157,13 +155,20 @@ impl Identifiers {
                 let number = String::from_utf8(att.value.to_vec())
                     .map_err(|err| DimensionUtf8::new(err, DimensionOrId::Width))?;
 
-                width = Some(number.parse().map_err(|err| DimensionParse::new(err, DimensionOrId::Width))?);
-
+                width = Some(
+                    number
+                        .parse()
+                        .map_err(|err| DimensionParse::new(err, DimensionOrId::Width))?,
+                );
             } else if att.key == HEIGHT {
                 let number = String::from_utf8(att.value.to_vec())
                     .map_err(|err| DimensionUtf8::new(err, DimensionOrId::Height))?;
 
-                height = Some(number.parse().map_err(|err| DimensionParse::new(err, DimensionOrId::Width))?);
+                height = Some(
+                    number
+                        .parse()
+                        .map_err(|err| DimensionParse::new(err, DimensionOrId::Width))?,
+                );
             } else if att.key == ID {
                 let id_utf8 = String::from_utf8(att.value.to_vec())
                     .map_err(|err| DimensionUtf8::new(err, DimensionOrId::Id))?;
@@ -171,11 +176,9 @@ impl Identifiers {
             }
         }
 
-        let out = match (width,height,id)  {
-            (Some(width), Some(height), Some(id)) => {
-                Identifiers {id, width, height }
-            }
-            (w, h, id) => return Err(MissingObjectIdentifier::new(elem.clone(), w, h, id).into())
+        let out = match (width, height, id) {
+            (Some(width), Some(height), Some(id)) => Identifiers { id, width, height },
+            (w, h, id) => return Err(MissingObjectIdentifier::new(elem.clone(), w, h, id).into()),
         };
 
         Ok(out)
@@ -195,18 +198,17 @@ impl EncodedImage {
     pub fn from_path<T: AsRef<Path>>(path: T) -> Result<Self, EncodingError> {
         let path = path.as_ref();
 
-        let mut file = std::fs::File::open(&path)
-            .map_err(|err| OpenFile::new(err, path.to_owned()))?;
+        let mut file =
+            std::fs::File::open(&path).map_err(|err| OpenFile::new(err, path.to_owned()))?;
 
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)
             .map_err(|err| ReadBytes::new(err, path.to_owned()))?;
 
-        let format = image::guess_format(&bytes)
-            .map_err(|_| UnknownMime::new(path.to_owned()))?;
+        let format = image::guess_format(&bytes).map_err(|_| UnknownMime::new(path.to_owned()))?;
 
         if !matches!(format, image::ImageFormat::Png) {
-            return Err(WrongEncoding::new(path.to_owned()).into())
+            return Err(WrongEncoding::new(path.to_owned()).into());
         }
 
         let mut base64_buf = String::with_capacity(bytes.len());
@@ -273,7 +275,9 @@ FUlEQVQY02MMaBRnwA2YGPCCkSoNACS6APwkkpJNAAAAAElFTkSuQmCC
     image.update_image(encoded_bytes);
 
     // pull out the element from the structure to ensure that we have changed it how we expected to
-    let output_image = image.element.attributes()
+    let output_image = image
+        .element
+        .attributes()
         .filter_map(|x| x.ok())
         .find(|att| att.key == QName(b"xlink:href"))
         .unwrap();
@@ -283,7 +287,7 @@ FUlEQVQY02MMaBRnwA2YGPCCkSoNACS6APwkkpJNAAAAAElFTkSuQmCC
 
     // ensure that the image has actually changed
     // here QmCC is a string from the end of the above element -
-    // if the element was updated correctly then the string should 
+    // if the element was updated correctly then the string should
     // not be present in the new image data
     assert_eq!(false, output_value.contains("QmCC"));
 }
@@ -325,7 +329,9 @@ fn update_rectangle() {
     let image = rect.set_image(encoded_bytes);
 
     // pull out the element from the structure to ensure that we have changed it how we expected to
-    let output_image = image.element.attributes()
+    let output_image = image
+        .element
+        .attributes()
         .filter_map(|x| x.ok())
         .find(|att| att.key == QName(b"xlink:href"))
         .unwrap();

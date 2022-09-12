@@ -1,9 +1,9 @@
-use std::io;
 use derive_more::{Constructor, From};
 use quick_xml::events::BytesStart;
+use std::io;
 
-use std::string::FromUtf8Error;
 use std::path::PathBuf;
+use std::string::FromUtf8Error;
 
 type StaticEvent = quick_xml::events::Event<'static>;
 
@@ -23,7 +23,7 @@ pub enum Error {
 #[error("Failed to write leading event `{event:?}` - error: `{err}`")]
 pub struct LeadingEvents {
     pub(crate) err: quick_xml::Error,
-    pub(crate) event: StaticEvent
+    pub(crate) event: StaticEvent,
 }
 
 #[derive(thiserror::Error, Debug, From)]
@@ -38,28 +38,28 @@ pub enum LayerError {
 #[error("Failed to write header for layer: `{header:?}` - error: `{err}`")]
 pub struct LayerHeader {
     pub(crate) err: quick_xml::Error,
-    pub(crate) header: StaticEvent
+    pub(crate) header: StaticEvent,
 }
 
 #[derive(thiserror::Error, Debug)]
 #[error("Failed to write object in layer body: {object:?} - error: `{err}`")]
 pub struct LayerBody {
     pub(crate) err: quick_xml::Error,
-    pub(crate) object: StaticEvent
+    pub(crate) object: StaticEvent,
 }
 
 #[derive(thiserror::Error, Debug, Constructor)]
 #[error("Failed to write footer for layer: {footer:?} - error: `{err}`")]
 pub struct LayerFooter {
     pub(crate) err: quick_xml::Error,
-    pub(crate) footer: StaticEvent
+    pub(crate) footer: StaticEvent,
 }
 
 #[derive(thiserror::Error, Debug, Constructor)]
 #[error("Failed to write trailing event `{event:?}` - error: `{err}`")]
 pub struct TrailingEvents {
     pub(crate) err: quick_xml::Error,
-    pub(crate) event: StaticEvent
+    pub(crate) event: StaticEvent,
 }
 
 #[derive(thiserror::Error, Debug, Constructor)]
@@ -82,8 +82,8 @@ pub enum ParseLayer {
 
 #[derive(thiserror::Error, Debug, Constructor)]
 #[error("missing `id` attribute for <g> attribute of layer, maybe it was not UTF8? `{element:?}`")]
-pub struct MissingLayerId{
-    element: BytesStart<'static>
+pub struct MissingLayerId {
+    element: BytesStart<'static>,
 }
 
 #[derive(thiserror::Error, Debug, Constructor)]
@@ -109,14 +109,14 @@ pub struct MissingLayerName {
 #[error("Failed to parse `{dimension}` parameter to utf8 string; error: `{error}`")]
 pub struct DimensionUtf8 {
     error: FromUtf8Error,
-    dimension: DimensionOrId
+    dimension: DimensionOrId,
 }
 
 #[derive(thiserror::Error, Debug, Constructor)]
 #[error("Failed to parse `{dimension}` parameter to utf8 string; error: `{error}`")]
 pub struct DimensionParse {
     error: std::num::ParseFloatError,
-    dimension: DimensionOrId
+    dimension: DimensionOrId,
 }
 
 #[derive(Debug, derive_more::Display)]
@@ -126,7 +126,7 @@ pub enum DimensionOrId {
     #[display(fmt = "height")]
     Height,
     #[display(fmt = "id")]
-    Id
+    Id,
 }
 
 #[derive(thiserror::Error, Debug, From)]
@@ -138,7 +138,6 @@ pub enum IdentifierError {
     #[error("Failed to parse identifier: `{0}`")]
     MissingObjectIdentifier(MissingObjectIdentifier),
 }
-
 
 #[derive(thiserror::Error, Debug, Constructor)]
 #[error("One of width ({width:?}) / height ({height:?}) / id ({id:?} was missing for element {element:?}")]
@@ -161,7 +160,6 @@ pub enum EncodingError {
     WrongEncoding(WrongEncoding),
 }
 
-
 #[derive(thiserror::Error, Debug, Constructor)]
 #[error("failed to open file at {}; error: {error}", "path.display()")]
 pub struct OpenFile {
@@ -170,20 +168,29 @@ pub struct OpenFile {
 }
 
 #[derive(thiserror::Error, Debug, Constructor)]
-#[error("failed to read bytes of file {} after it was opened; error: {error}", "path.display()")]
+#[error(
+    "failed to read bytes of file {} after it was opened; error: {error}",
+    "path.display()"
+)]
 pub struct ReadBytes {
     error: io::Error,
     path: PathBuf,
 }
 
 #[derive(thiserror::Error, Debug, Constructor)]
-#[error("image at path {} has an unknown mime type. figure_second only handles PNG encoded images", "path.display()")]
+#[error(
+    "image at path {} has an unknown mime type. figure_second only handles PNG encoded images",
+    "path.display()"
+)]
 pub struct UnknownMime {
     path: PathBuf,
 }
 
 #[derive(thiserror::Error, Debug, Constructor)]
-#[error("image at path {} is not PNG encoded. Images must be png encoded currently", "path.display()")]
+#[error(
+    "image at path {} is not PNG encoded. Images must be png encoded currently",
+    "path.display()"
+)]
 pub struct WrongEncoding {
     path: PathBuf,
 }

@@ -1,6 +1,6 @@
+mod error;
 mod object;
 mod parse;
-mod error;
 
 use error::*;
 
@@ -45,24 +45,16 @@ impl Layer {
             panic!("miss parsed a layer, the header should be Event::Start");
         };
 
-        let curr_style = elem.attributes()
+        let mut new_elem = elem.to_owned();
+        new_elem.clear_attributes();
+
+        let atts = elem
+            .attributes()
             .filter_map(Result::ok)
-            .find(|att| att.key == QName(b"style"));
+            .filter(|att| att.key != QName(b"style"));
 
-        // if there is a style set, just filter it out
-        // `style` attribute is how elements are shown and hidden
-        if curr_style.is_some() {
-            let mut new_elem = elem.to_owned();
-            new_elem.clear_attributes();
-
-            let atts = elem.attributes()
-                .filter_map(Result::ok)
-                .filter(|att| att.key != QName(b"style"));
-
-            new_elem.extend_attributes(atts);
-            self.header = Event::Start(new_elem);
-
-        }
+        new_elem.extend_attributes(atts);
+        self.header = Event::Start(new_elem);
     }
 
     /// make a layer hidden
@@ -76,10 +68,14 @@ impl Layer {
         let mut new_elem = elem.to_owned();
         new_elem.clear_attributes();
 
-        let atts = elem.attributes()
+        let atts = elem
+            .attributes()
             .filter_map(Result::ok)
-            .filter(|att| att.value != b"style".as_slice())
-            .chain(std::iter::once(quick_xml::events::attributes::Attribute { key: QName(b"style"), value: b"display:none".as_slice().into() }));
+            .filter(|att| att.key != QName(b"style"))
+            .chain(std::iter::once(quick_xml::events::attributes::Attribute {
+                key: QName(b"style"),
+                value: b"display:none".as_slice().into(),
+            }));
 
         new_elem.extend_attributes(atts);
         self.header = Event::Start(new_elem);
@@ -106,22 +102,28 @@ impl Inkscape {
             writer
                 .write_event(&event)
                 .map_err(|err| LeadingEvents { err, event })?;
-                //.with_context(|| format!("failed to write a leading event: {:?}", event))?;
+            //.with_context(|| format!("failed to write a leading event: {:?}", event))?;
         }
 
         for layer in self.layers {
-            writer.write_event(&layer.header)
-                .map_err(|err| LayerHeader { err, header: layer.header })
+            writer
+                .write_event(&layer.header)
+                .map_err(|err| LayerHeader {
+                    err,
+                    header: layer.header,
+                })
                 .map_err(LayerError::from)?;
 
             for object in layer.content {
                 let event = object.into_event();
-                writer.write_event(&event)
-                    .map_err(|err| LayerBody {err, object: event})
+                writer
+                    .write_event(&event)
+                    .map_err(|err| LayerBody { err, object: event })
                     .map_err(LayerError::from)?;
             }
 
-            writer.write_event(&layer.footer)
+            writer
+                .write_event(&layer.footer)
                 .map_err(|err| LayerFooter::new(err, layer.footer))
                 .map_err(LayerError::from)?;
         }
@@ -293,12 +295,8 @@ fn id_iterator() {
         Layer::eof_group_test(vec![]),
         Layer::eof_group_test(vec![
             Object::Rectangle(Rectangle::from_ident(Identifiers::zeros_with_id("4"))),
-            Object::Other(Event::Empty(BytesStart::new(
-                "doesnt_matter",
-            ))),
-            Object::Other(Event::Empty(BytesStart::new(
-                "doesnt_matter2",
-            ))),
+            Object::Other(Event::Empty(BytesStart::new("doesnt_matter"))),
+            Object::Other(Event::Empty(BytesStart::new("doesnt_matter2"))),
             Object::Rectangle(Rectangle::from_ident(Identifiers::zeros_with_id("5"))),
         ]),
         Layer::eof_group_test(vec![]),
@@ -341,5 +339,25 @@ fn make_layer_hidden() {
     }
 
     inkscape.write_svg(writer).unwrap();
-    panic!()
+}
+
+#[test]
+fn many_layers_parse() {
+    let path = "./static/julia_python_share_cxx.svg";
+    let reader = std::io::BufReader::new(std::fs::File::open(path).unwrap());
+    let mut buffer = Vec::new();
+    let inkscape = Inkscape::parse_svg(reader, &mut buffer).unwrap();
+    let layer_names = inkscape
+        .get_layers()
+        .iter()
+        .map(|layer| layer.name().to_string())
+        .collect::<Vec<String>>();
+
+    assert!(layer_names.contains(&"pythoncode".to_string()));
+    assert!(layer_names.contains(&"sharedcode".to_string()));
+    assert!(layer_names.contains(&"juliacode".to_string()));
+    assert!(layer_names.contains(&"julia_bindings".to_string()));
+    assert!(layer_names.contains(&"python_bindings".to_string()));
+
+    panic!();
 }
